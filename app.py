@@ -13,7 +13,7 @@ from scipy.stats import zscore
 
 # Set page configuration
 st.set_page_config(
-    page_title="Marketing Campaign Analysis Dashboard",
+    page_title="Customer conversion prediction",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -82,10 +82,10 @@ def clean_data(df):
         df['Age'] = 2023 - df['Year_Birth']
         # Create total spending column
         df['Total_Spending'] = df[['MntWines', 'MntFruits', 'MntMeatProducts', 
-                                 'MntFishProducts', 'MntSweetProducts', 'MntGoldProds']].sum(axis=1)
+                                 'MntFishProducts', 'MntSweetProducts']].sum(axis=1)
         # Remove outliers using Z-score
         numerical_cols = ['Income', 'MntWines', 'MntFruits', 'MntMeatProducts', 'MntFishProducts', 
-                         'MntSweetProducts', 'MntGoldProds', 'NumDealsPurchases', 'NumWebPurchases', 
+                         'MntSweetProducts','NumDealsPurchases', 'NumWebPurchases', 
                          'NumCatalogPurchases', 'NumStorePurchases', 'NumWebVisitsMonth']
         # Calculate Z-scores
         z_scores = df[numerical_cols].apply(zscore)
@@ -139,18 +139,17 @@ def predict_response(model, scaler, feature_vector):
     return prediction, probability
 
 # Main app layout
-st.title("📊 Marketing Campaign Analysis Dashboard")
+st.title("📊 Customer conversion prediction")
 
 # Sidebar navigation with icons
 st.sidebar.header("Navigation")
 page = st.sidebar.radio("Go to", [
-    "🏠 Home", 
-    "📈 Campaign Analysis", 
-    "🎯 Channel Effectiveness", 
-    "🛍️ Product Analysis", 
-    "👥 Customer Demographics", 
-    "💰 ROI Analysis", 
-    "🔮 Predictive Model"
+    "Home", 
+    "Campaign Analysis", 
+    "Channel Effectiveness", 
+    "Product Analysis", 
+    "Customer Demographics", 
+    "Predictive Model"
 ])
 
 # Load data section
@@ -162,12 +161,12 @@ with st.expander("📂 Data Upload & Overview", expanded=True):
     
     if data is not None:
         # Clean data toggle
-        clean_data_toggle = st.checkbox("✅ Clean Data", value=True, key="clean_data_main")
+        clean_data_toggle = st.checkbox("Clean Data", value=True, key="clean_data_main")
         if clean_data_toggle:
             data = clean_data(data)
         
         # Display basic data info
-        st.markdown("### 📊 Dataset Summary")
+        st.markdown("### Dataset Summary")
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f"**Rows:** {data.shape[0]}")
@@ -177,7 +176,7 @@ with st.expander("📂 Data Upload & Overview", expanded=True):
             st.markdown(f"**Missing Values:** {data.isnull().sum().sum()}")
         
         # Show raw data if toggled
-        if st.checkbox("🔍 Show Raw Data"):
+        if st.checkbox("Show Raw Data"):
             st.dataframe(data.head(10))
     else:
         st.info("Please upload your dataset to begin analysis")
@@ -186,10 +185,10 @@ with st.expander("📂 Data Upload & Overview", expanded=True):
 # Page content based on navigation selection
 if data is not None:
     # Data Overview Page
-    if page == "🏠 Home":
+    if page == "Home":
         st.header("Data Overview")
         
-        st.markdown("### 📈 Numeric Column Distribution")
+        st.markdown("### Numeric Column Distribution")
         numeric_cols = data.select_dtypes(include=['int64', 'float64']).columns.tolist()
         selected_col = st.selectbox("Select column to visualize", numeric_cols)
         
@@ -200,58 +199,100 @@ if data is not None:
         
         st.markdown("### 🔍 Correlation Analysis")
         corr = data[numeric_cols].corr()
-        fig, ax = plt.subplots(figsize=(12, 10))
+
+        # Adjust figure size based on number of columns
+        fig_size = max(10, len(numeric_cols)), max(8, len(numeric_cols) * 0.7)
+        fig, ax = plt.subplots(figsize=fig_size)
+
+        # Generate a mask for the upper triangle
         mask = np.triu(np.ones_like(corr, dtype=bool))
-        sns.heatmap(corr, mask=mask, annot=True, fmt=".2f", cmap='coolwarm', square=True, ax=ax)
+
+        # Draw the heatmap with better font sizes and spacing
+        sns.heatmap(
+        corr,
+        mask=mask,
+        annot=True,
+        fmt=".2f",
+        cmap='coolwarm',
+        square=True,
+        linewidths=.5,
+        cbar_kws={"shrink": .75},
+        annot_kws={"size": 10},  # Reduce annotation font size
+        ax=ax
+        )
+
+        # Improve label readability
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=10)
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=10)
+
+        # Tight layout to avoid clipping
+        plt.tight_layout()
+
+        # Show plot
         st.pyplot(fig)
 
     # Campaign Analysis Page
-    elif page == "📈 Campaign Analysis":
+    elif page == "Campaign Analysis":
         st.header("Campaign Analysis")
-        
-        st.markdown("### 📊 Campaign Engagement Rates")
+
+        st.markdown("### Campaign Engagement Rates")
         campaign_columns = ['AcceptedCmp1', 'AcceptedCmp2', 'AcceptedCmp3', 'AcceptedCmp4', 'AcceptedCmp5']
         engagement_rates = data[campaign_columns].mean() * 100
-        
+
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x=engagement_rates.index, y=engagement_rates.values, palette="Blues_d", ax=ax)
         ax.set_ylabel("Engagement Rate (%)")
         ax.set_title("Engagement Rates Across Campaigns")
+
         for i, v in enumerate(engagement_rates.values):
             ax.text(i, v + 1, f"{v:.2f}%", ha='center', va='bottom')
+
+         # Fix: Add padding to the top of y-axis so text stays inside
+        ax.set_ylim(top=max(engagement_rates.values) * 1.35)
+
         st.pyplot(fig)
-        
-        st.markdown("### 👥 Response by Age Group")
+
+        st.markdown("### Response by Age Group")
         bins = [0, 30, 40, 50, 60, 100]
         labels = ['<30', '30-40', '40-50', '50-60', '>60']
         data['Age_Group'] = pd.cut(data['Age'], bins=bins, labels=labels)
         conversion_by_age = data.groupby('Age_Group')['Response'].mean() * 100
-        
+
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x=conversion_by_age.index, y=conversion_by_age.values, palette="Blues_d", ax=ax)
         ax.set_ylabel("Conversion Rate (%)")
         ax.set_title("Conversion Rates by Age Group")
+
         for i, v in enumerate(conversion_by_age.values):
             ax.text(i, v + 1, f"{v:.2f}%", ha='center', va='bottom')
+
+        # Fix: Add padding to the top of y-axis
+        ax.set_ylim(top=max(conversion_by_age.values) * 1.15)
+
         st.pyplot(fig)
-        
-        st.markdown("### 🧑‍🤝‍🧑 Response by Marital Status")
+
+        st.markdown("### Response by Marital Status")
         conversion_by_status = data.groupby('Marital_Status')['Response'].mean() * 100
-        
+
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(x=conversion_by_status.index, y=conversion_by_status.values, palette="Blues_d", ax=ax)
         ax.set_ylabel("Conversion Rate (%)")
         ax.set_title("Conversion Rates by Marital Status")
         ax.tick_params(axis='x', rotation=45)
+
         for i, v in enumerate(conversion_by_status.values):
             ax.text(i, v + 1, f"{v:.2f}%", ha='center', va='bottom')
+
+        # Fix: Add padding to the top of y-axis
+        ax.set_ylim(top=max(conversion_by_status.values) * 1.15)
+
         st.pyplot(fig)
 
     # Channel Effectiveness Page
-    elif page == "🎯 Channel Effectiveness":
+    elif page == "Channel Effectiveness":
         st.header("Channel Effectiveness")
         
-        st.markdown("### 📊 Conversion Rates by Channel")
+        st.markdown("### Conversion Rates by Channel")
         avg_web_visits = data['NumWebVisitsMonth'].mean()
         avg_web_purchases = data['NumWebPurchases'].mean()
         avg_catalog_purchases = data['NumCatalogPurchases'].mean()
@@ -273,26 +314,26 @@ if data is not None:
             ax.text(i, v + 1, f"{v:.2f}%", ha='center', va='bottom')
         st.pyplot(fig)
         
-        st.markdown("### 📈 Channel Performance Metrics")
+        st.markdown("### Channel Performance Metrics")
         col1, col2, col3 = st.columns(3)
         with col1:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">{avg_web_visits:.1f}</div>
+                    <div class="metric-value">Avg Web Visits : {avg_web_visits:.1f}</div>
                     Avg Web Visits/Month
                 </div>
             """, unsafe_allow_html=True)
         with col2:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">{avg_web_purchases:.1f}</div>
+                    <div class="metric-value">avg web purchases : {avg_web_purchases:.1f}</div>
                     Avg Web Purchases
                 </div>
             """, unsafe_allow_html=True)
         with col3:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">${conversion_rate_web:.1f}%</div>
+                    <div class="metric-value">conversion rate web : {conversion_rate_web:.1f}%</div>
                     Web Conversion Rate
                 </div>
             """, unsafe_allow_html=True)
@@ -301,26 +342,26 @@ if data is not None:
         with col4:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">{avg_catalog_purchases:.1f}</div>
+                    <div class="metric-value">avg catalog purchases : {avg_catalog_purchases:.1f}</div>
                     Avg Catalog Purchases
                 </div>
             """, unsafe_allow_html=True)
         with col5:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">{avg_store_purchases:.1f}</div>
+                    <div class="metric-value">avg store purchases : {avg_store_purchases:.1f}</div>
                     Avg Store Purchases
                 </div>
             """, unsafe_allow_html=True)
         with col6:
             st.markdown(f"""
                 <div class="metric-card">
-                    <div class="metric-value">${conversion_rate_store:.1f}%</div>
+                    <div class="metric-value">conversion rate store : {conversion_rate_store:.1f}%</div>
                     Store Conversion Rate
                 </div>
             """, unsafe_allow_html=True)
             
-        st.markdown("### 🥧 Channel Distribution")
+        st.markdown("### Channel Distribution")
         fig, ax = plt.subplots(figsize=(10, 6))
         plt.pie(conversion_rates['Conversion Rate (%)'], labels=conversion_rates['Channel'], 
                autopct='%1.1f%%', startangle=90, colors=sns.color_palette("viridis"))
@@ -328,17 +369,16 @@ if data is not None:
         st.pyplot(fig)
 
     # Product Analysis Page
-    elif page == "🛍️ Product Analysis":
+    elif page == "Product Analysis":
         st.header("Product Analysis")
         
-        st.markdown("### 📦 Total Sales by Product Category")
+        st.markdown("### Total Sales by Product Category")
         total_sales = {
             'Wines': data['MntWines'].sum(),
             'Fruits': data['MntFruits'].sum(),
             'Meat Products': data['MntMeatProducts'].sum(),
             'Fish Products': data['MntFishProducts'].sum(),
-            'Sweet Products': data['MntSweetProducts'].sum(),
-            'Gold Products': data['MntGoldProds'].sum()
+            'Sweet Products': data['MntSweetProducts'].sum()
         }
         
         total_sales_df = pd.DataFrame(list(total_sales.items()), columns=['Product', 'Total_Sales'])
@@ -348,10 +388,11 @@ if data is not None:
         sns.barplot(x='Total_Sales', y='Product', data=total_sales_df, palette="magma", ax=ax)
         ax.set_title("Total Sales by Product Category")
         for i, v in enumerate(total_sales_df['Total_Sales']):
-            ax.text(v + 1000, i, f"${v:,.0f}", ha='left', va='center')
+            ax.text(v * 0.95, i, f"${v:,.0f}", ha='right', va='center', color='white', fontsize=10)
+        plt.tight_layout()
         st.pyplot(fig)
         
-        st.markdown("### 📊 Product Sales by Demographic")
+        st.markdown("### Product Sales by Demographic")
         demographic_option = st.selectbox("Analyze Product Sales by:", ["Age Group", "Marital Status", "Education"])
         
         if demographic_option == "Age Group":
@@ -360,16 +401,16 @@ if data is not None:
                 labels = ['<30', '30-40', '40-50', '50-60', '>60']
                 data['Age_Group'] = pd.cut(data['Age'], bins=bins, labels=labels)
             group_sales = data.groupby('Age_Group')[['MntWines', 'MntFruits', 'MntMeatProducts', 
-                                                'MntFishProducts', 'MntSweetProducts', 'MntGoldProds']].sum()
-            st.markdown("#### 📌 Age Group Analysis")
+                                                'MntFishProducts', 'MntSweetProducts']].sum()
+            st.markdown("#### Age Group Analysis")
         elif demographic_option == "Marital Status":
             group_sales = data.groupby('Marital_Status')[['MntWines', 'MntFruits', 'MntMeatProducts', 
-                                                    'MntFishProducts', 'MntSweetProducts', 'MntGoldProds']].sum()
-            st.markdown("#### 📌 Marital Status Analysis")
+                                                    'MntFishProducts', 'MntSweetProducts']].sum()
+            st.markdown("#### Marital Status Analysis")
         else:
             group_sales = data.groupby('Education')[['MntWines', 'MntFruits', 'MntMeatProducts', 
-                                              'MntFishProducts', 'MntSweetProducts', 'MntGoldProds']].sum()
-            st.markdown("#### 📌 Education Level Analysis")
+                                              'MntFishProducts', 'MntSweetProducts']].sum()
+            st.markdown("#### Education Level Analysis")
         
         fig, ax = plt.subplots(figsize=(12, 8))
         group_sales.plot(kind='bar', stacked=True, ax=ax, colormap="tab20")
@@ -378,10 +419,10 @@ if data is not None:
         st.pyplot(fig)
 
     # Customer Demographics Page
-    elif page == "👥 Customer Demographics":
+    elif page == "Customer Demographics":
         st.header("Customer Demographics")
         
-        st.markdown("### 📊 Age & Income Distributions")
+        st.markdown("### Age & Income Distributions")
         col1, col2 = st.columns(2)
         
         with col1:
@@ -396,7 +437,7 @@ if data is not None:
             ax.set_title("Income Distribution")
             st.pyplot(fig)
             
-        st.markdown("### 📈 Demographic Breakdown")
+        st.markdown("### Demographic Breakdown")
         col3, col4 = st.columns(2)
         
         with col3:
@@ -419,7 +460,7 @@ if data is not None:
                 ax.text(i, v + 5, str(v), ha='center', va='bottom')
             st.pyplot(fig)
             
-        st.markdown("### 📊 Family Composition")
+        st.markdown("### Family Composition")
         col5, col6 = st.columns(2)
         
         with col5:
@@ -437,64 +478,9 @@ if data is not None:
                   colors=sns.color_palette("Set2"))
             ax.set_title("Customers with Teenagers")
             st.pyplot(fig)
-
-    # ROI Analysis Page
-    elif page == "💰 ROI Analysis":
-        st.header("ROI Analysis")
-        
-        if all(col in data.columns for col in ['Z_Revenue', 'Z_CostContact']):
-            data['Net_Profit'] = data['Z_Revenue'] - data['Z_CostContact']
-            data['ROI'] = (data['Net_Profit'] / data['Z_CostContact']) * 100
-            
-            st.markdown("### 💰 Key ROI Metrics")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-value">${data['Net_Profit'].mean():.2f}</div>
-                        Average Net Profit
-                    </div>
-                """, unsafe_allow_html=True)
-            with col2:
-                st.markdown(f"""
-                    <div class="metric-card">
-                        <div class="metric-value">{data['ROI'].mean():.2f}%</div>
-                        Average ROI
-                    </div>
-                """, unsafe_allow_html=True)
-                
-            st.markdown("### 📈 ROI Distribution")
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.histplot(data['ROI'], bins=30, kde=True, ax=ax, color="#fd7e14")
-            ax.set_title("ROI Distribution")
-            st.pyplot(fig)
-            
-            st.markdown("### 📊 ROI by Age Group")
-            if 'Age_Group' not in data.columns:
-                bins = [0, 30, 40, 50, 60, 100]
-                labels = ['<30', '30-40', '40-50', '50-60', '>60']
-                data['Age_Group'] = pd.cut(data['Age'], bins=bins, labels=labels)
-            roi_by_age = data.groupby('Age_Group')['ROI'].mean()
-            
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.barplot(x=roi_by_age.index, y=roi_by_age.values, palette="viridis", ax=ax)
-            ax.set_ylabel("Average ROI (%)")
-            ax.set_title("Average ROI by Age Group")
-            for i, v in enumerate(roi_by_age.values):
-                ax.text(i, v + 1, f"{v:.2f}%", ha='center', va='bottom')
-            st.pyplot(fig)
-            
-            st.markdown("### 📉 Cost vs Revenue")
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.scatterplot(x='Z_CostContact', y='Z_Revenue', data=data, alpha=0.6, ax=ax, color="#6f42c1")
-            ax.set_title("Campaign Cost vs Revenue")
-            st.pyplot(fig)
-            
-        else:
-            st.warning("Revenue or Cost columns not found in the dataset")
             
     # Predictive Model Page
-    elif page == "🔮 Predictive Model":
+    elif page == "Predictive Model":
         st.header("Predictive Model Training")
         
         st.markdown("""
@@ -510,7 +496,7 @@ if data is not None:
         train_tab, predict_tab = st.tabs(["Train Model", "Make Predictions"])
         
         with train_tab:
-            if st.button("🧠 Train Model"):
+            if st.button("Train Model"):
                 with st.spinner("Training model... This may take a moment."):
                     try:
                         model, scaler, X_test_scaled, y_test, y_pred, y_pred_proba, feature_importances, feature_names = train_model(data)
@@ -522,33 +508,10 @@ if data is not None:
                         if model is not None:
                             st.success("Model trained successfully!")
                             
-                            st.markdown("### 📋 Model Performance")
+                            st.markdown("### Model Performance")
                             st.text(classification_report(y_test, y_pred))
-                            
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.markdown("### 🔍 Confusion Matrix")
-                                cm = confusion_matrix(y_test, y_pred)
-                                fig, ax = plt.subplots(figsize=(8, 6))
-                                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-                                plt.ylabel('Actual')
-                                plt.xlabel('Predicted')
-                                st.pyplot(fig)
-                                
-                            with col2:
-                                st.markdown("### 📈 ROC Curve")
-                                fpr, tpr, _ = roc_curve(y_test, y_pred_proba)
-                                auc = roc_auc_score(y_test, y_pred_proba)
-                                fig, ax = plt.subplots(figsize=(8, 6))
-                                plt.plot(fpr, tpr, label=f'AUC = {auc:.3f}', color='#007bff')
-                                plt.plot([0, 1], [0, 1], 'k--', color='#dc3545')
-                                plt.xlabel('False Positive Rate')
-                                plt.ylabel('True Positive Rate')
-                                plt.legend(loc='lower right')
-                                st.pyplot(fig)
-                                
-                            st.markdown("### 📊 Feature Importance")
+                                                
+                            st.markdown("### Feature Importance")
                             fig, ax = plt.subplots(figsize=(12, 8))
                             sns.barplot(x='Importance', y='Feature', data=feature_importances.head(15), palette="viridis", ax=ax)
                             plt.title("Top 15 Important Features")
@@ -557,7 +520,7 @@ if data is not None:
                             col3, col4 = st.columns(2)
                             
                             with col3:
-                                if st.button("💾 Download Model"):
+                                if st.button("Download Model"):
                                     joblib.dump(model, 'marketing_campaign_model.pkl')
                                     joblib.dump(scaler, 'feature_scaler.pkl')
                                     st.success("Model saved as 'marketing_campaign_model.pkl'")
@@ -566,7 +529,7 @@ if data is not None:
                         st.error(f"An error occurred during model training: {e}")
         
         with predict_tab:
-            st.markdown("### 🎯 Prediction Interface")
+            st.markdown("### Prediction Interface")
             
             if st.session_state.model is None:
                 st.warning("Please train a model first before making predictions")
@@ -587,11 +550,11 @@ if data is not None:
                         web_purchases = st.number_input("🛒 Web Purchases", min_value=0, value=3)
                         
                     with col3:
-                        store_purchases = st.number_input("🛍️ Store Purchases", min_value=0, value=3)
-                        has_children = st.checkbox("👨‍👩‍👧‍👦 Has Children")
-                        previous_campaign = st.checkbox("🔁 Responded to Previous Campaign")
+                        store_purchases = st.number_input("Store Purchases", min_value=0, value=3)
+                        has_children = st.checkbox("Has Children")
+                        previous_campaign = st.checkbox("Responded to Previous Campaign")
                     
-                    submitted = st.form_submit_button("🚀 Predict Response")
+                    submitted = st.form_submit_button("Predict Response")
                     
                     if submitted:
                         features = {
@@ -617,17 +580,17 @@ if data is not None:
                             feature_vector
                         )
                         
-                        st.markdown("### ✅ Prediction Result")
+                        st.markdown("### Prediction Result")
                         col_result, col_gauge = st.columns([2, 1])
                         
                         with col_result:
                             if prediction == 1:
                                 st.markdown("<div class='metric-card' style='background-color: #d4edda; color: #155724;'>" +
-                                           "✅ Customer is likely to respond to the campaign" +
+                                           "✅ visitor is likely to buy something" +
                                            "</div>", unsafe_allow_html=True)
                             else:
                                 st.markdown("<div class='metric-card' style='background-color: #f8d7da; color: #721c24;'>" +
-                                           "❌ Customer is unlikely to respond to the campaign" +
+                                           "visitor is unlikely to buy something" +
                                            "</div>", unsafe_allow_html=True)
                         
                         with col_gauge:
@@ -656,4 +619,4 @@ if data is not None:
                                        "</div>", unsafe_allow_html=True)
 else:
     st.sidebar.markdown("---")
-    st.sidebar.info("Marketing Campaign Analysis Tool")
+    
